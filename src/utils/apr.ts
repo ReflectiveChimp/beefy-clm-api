@@ -36,9 +36,22 @@ export function prepareAprState(state: AprState): AprState {
   return cleanedEntries;
 }
 
+/**
+ * Evicts all but the most recent entry outside the period
+ * @dev assumes state sorted by timestamp in ascending order (oldest first)
+ */
 export function evictOldAprEntries(state: AprState, periodMs: number, now: Date): AprState {
   const threshold = now.getTime() - periodMs;
-  return state.filter(entry => entry.collectTimestamp.getTime() >= threshold);
+  const lastIndexOutsidePeriod = state.findLastIndex(
+    entry => entry.collectTimestamp.getTime() < threshold
+  );
+
+  // none are outside threshold
+  if (lastIndexOutsidePeriod === -1) {
+    return state;
+  }
+
+  return state.slice(lastIndexOutsidePeriod);
 }
 
 export function calculateLastApr(

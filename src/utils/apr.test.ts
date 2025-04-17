@@ -47,28 +47,28 @@ describe('Apr', () => {
     let aprState = prepareAprState([
       {
         collectedAmount: new Decimal(100),
-        collectTimestamp: new Date(100 * 1000),
+        collectTimestamp: new Date(100 * 1000), // outside
         totalValueLocked: new Decimal(1000),
       },
       {
         collectedAmount: new Decimal(200),
-        collectTimestamp: new Date(200 * 1000),
+        collectTimestamp: new Date(200 * 1000), // first outside
         totalValueLocked: new Decimal(2000),
       },
       {
         collectedAmount: new Decimal(300),
-        collectTimestamp: new Date(69382300 * 1000),
+        collectTimestamp: new Date(69382300 * 1000), // inside
         totalValueLocked: new Decimal(3000),
       },
       {
         collectedAmount: new Decimal(400),
-        collectTimestamp: new Date(69382400 * 1000),
+        collectTimestamp: new Date(69382400 * 1000), // inside
         totalValueLocked: new Decimal(4000),
       },
     ]);
     const now = new Date(69382400 * 1000);
     aprState = evictOldAprEntries(aprState, ONE_DAY, now);
-    expect(aprState.length).toEqual(2);
+    expect(aprState.length).toEqual(3);
   });
 
   test('should compute apr properly with one entry of zero duration', () => {
@@ -83,6 +83,32 @@ describe('Apr', () => {
     const now = new Date(100 * 1000);
     const res = calculateLastApr(aprState, ONE_DAY, now);
     expect(res.apr.toNumber()).toEqual(ZERO_BD.toNumber());
+  });
+
+  test('should compute apr properly with one entry inside period', () => {
+    const aprState = prepareAprState([
+      {
+        collectTimestamp: new Date(ONE_DAY), // outside
+        collectedAmount: new Decimal(100),
+        totalValueLocked: new Decimal(1000), // 36.5% APR
+      },
+      {
+        collectTimestamp: new Date(ONE_DAY * 1.5), // first outside
+        collectedAmount: new Decimal(50),
+        totalValueLocked: new Decimal(1000), // 18.25% APR
+      },
+      {
+        collectTimestamp: new Date(ONE_DAY * 2.5), // inside
+        collectedAmount: new Decimal(100),
+        totalValueLocked: new Decimal(1000), // 36.5% APR
+      },
+    ]);
+
+    const now = new Date(ONE_DAY * 3);
+    const res = calculateLastApr(aprState, ONE_DAY, now);
+    // before this would calculate 73% as it would take only the last entries collectedAmount,
+    // but use the difference between now and collectTimestamp for the duration
+    expect(res.apr.toNumber()).toEqual(36.5);
   });
 
   test('Should calculate APR with one entry only, non regression for 0% apr on uniswap-cow-arb-weth-usdc.e-prod', async () => {
